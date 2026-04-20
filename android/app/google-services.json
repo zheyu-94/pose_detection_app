@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "562232319704",
+    "project_id": "posedetect-6b14f",
+    "storage_bucket": "posedetect-6b14f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:562232319704:android:6eac6c61f4ea203a6441ad",
+        "android_client_info": {
+          "package_name": "com.example.pose_detection_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXD6mxKLAAC5AxAEHYqO8kFCLdUKJEVFw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
