@@ -6,6 +6,7 @@ import 'screens/start_workout_screen.dart';
 import 'screens/training_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,13 +33,12 @@ class MyApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // 還在檢查狀態時，顯示載入圈圈
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           // 如果 snapshot 有資料，代表已登入！
-          if (snapshot.hasData) {
-            return const MainLayout();
+          if (snapshot.hasData && snapshot.data != null) {
+            return MainLayout(user: snapshot.data!);
           }
           // 否則退回登入畫面
           return const LoginScreen();
@@ -48,184 +48,121 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// 🌟 App 的主要框架 (包含側邊欄 Drawer 和主畫面內容)
+
+
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final User user;
+  const MainLayout({super.key, required this.user});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  final String userName = "哲宇"; // 假資料：用戶名稱
-  final int streakDays = 5; // 假資料：連續登入天數
+  // 刪除假資料變數，改用 Stream 或 Future 讀取
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // 1. 頂部導覽列
-      appBar: AppBar(
-        title: Text('$userName, 你好!', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.grey[800],
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-          )
-        ],
-      ),
+    // 使用 StreamBuilder 監聽目前使用者的 Firestore 文件
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(widget.user.uid).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-      // 2. 左側抽屜選單
-      drawer: Drawer(
-        backgroundColor: const Color(0xFF1E1E1E),
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Colors.grey[900]),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const CircleAvatar(radius: 30, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 35, color: Colors.white)),
-                  const SizedBox(height: 10),
-                  Text('$userName, 你好!', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            _buildDrawerItem(Icons.list_alt, '菜單規劃', () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuPlanningScreen()));
-            }),
-            _buildDrawerItem(Icons.play_circle_fill, '開始運動', () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const StartWorkoutScreen()));
-            }),
-            _buildDrawerItem(Icons.restaurant, '飲食規劃', () { /* 導航到飲食規劃 */ }),
-            _buildDrawerItem(Icons.menu_book, '動作教學', () { /* 導航到動作教學 */ }),
-            _buildDrawerItem(Icons.history, '運動紀錄', () { /* 導航到運動紀錄 */ }),
-            _buildDrawerItem(Icons.monitor_weight, '體態紀錄', () { /* 導航到體態紀錄 */ }),
-          ],
-        ),
-      ),
+        var userData = snapshot.data!.data() as Map<String, dynamic>;
+        String name = userData['name'] ?? "用戶";
+        String role = userData['role'] ?? "user";
 
-      // 3. 主畫面內容
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // (1) 連續登入與開始按鈕區塊
-            Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey[800]!),
-              ),
-              child: Column(
-                children: [
-                  Text('連續登入天數: $streakDays 天', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 5),
-                  const Text('加油!!!', style: TextStyle(fontSize: 18, color: Colors.amber)),
-                  const SizedBox(height: 20),
-
-                  // 🌟 大大的開始訓練按鈕 (升級版)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () async {
-                        // 1. 顯示讀取中的提示
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('正在尋找今日菜單...'), duration: Duration(seconds: 1)),
-                        );
-
-                        // 2. 獲取今天的日期
-                        DateTime now = DateTime.now();
-                        String dateString = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
-                        try {
-                          // 3. 呼叫 Firebase 檢查今天的菜單
-                          DocumentSnapshot doc = await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc('test_user') // 與我們菜單規劃存的 UID 一致
-                              .collection('daily_workouts')
-                              .doc(dateString)
-                              .get();
-
-                          // 確保畫面還存在才做跳轉 (Flutter 異步操作的最佳實踐)
-                          if (context.mounted) {
-                            if (doc.exists && doc.data() != null) {
-                              List<dynamic> exercises = doc.get('exercises') ?? [];
-
-                              if (exercises.isNotEmpty) {
-                                // 🌟 成功找到菜單！抓取「第一個」動作名稱
-                                String firstExerciseName = exercises.first['name'];
-
-                                // 跳轉到相機畫面，並把動作名稱傳過去！
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TrainingScreen(exerciseName: firstExerciseName),
-                                  ),
-                                );
-                              } else {
-                                // 雖然有文件，但裡面沒有動作
-                                _showNoWorkoutAlert(context);
-                              }
-                            } else {
-                              // 今天完全沒有排菜單
-                              _showNoWorkoutAlert(context);
-                            }
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('讀取失敗: $e'), backgroundColor: Colors.red),
-                            );
-                          }
-                        }
-                      },
-                      child: const Text('開始訓練', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // (2) 訓練建議區塊
-            const Text('💡 訓練建議:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.grey[800]!),
-                ),
-                child: const SingleChildScrollView(
-                  child: Text(
-                    "根據妳最近的運動紀錄：\n\n"
-                        "1. 妳的胸部訓練量充足，建議今天可以安排「背部」或「腿部」的訓練，讓肌肉有足夠的時間恢復。\n\n"
-                        "2. 上次「啞鈴二頭肌彎舉」的姿勢穩定度很高，今天可以嘗試增加 1~2 公斤的重量。\n\n"
-                        "3. 記得運動前要充分熱身，並補充充足的水分喔！",
-                    style: TextStyle(fontSize: 16, height: 1.6, color: Colors.white70),
+        // 如果是教練，我們可以在這裡 return 一個不同的 UI 或者是教練專用的 Drawer
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('$name, 你好! (${role == 'coach' ? '教練' : '學員'})'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.account_circle),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+              )
+            ],
+          ),
+          drawer: Drawer(
+            backgroundColor: const Color(0xFF1E1E1E),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                // 側邊欄頭部：顯示姓名與 Email
+                UserAccountsDrawerHeader(
+                  decoration: BoxDecoration(color: Colors.grey[900]),
+                  accountName: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  accountEmail: Text(userData['email'] ?? ""),
+                  currentAccountPicture: const CircleAvatar(
+                    backgroundColor: Colors.blueAccent,
+                    child: Icon(Icons.person, size: 40, color: Colors.white),
                   ),
                 ),
-              ),
+
+                // --- 🌸 學員專屬功能區 ---
+                if (role == 'user') ...[
+                  _buildDrawerItem(Icons.list_alt, '菜單規劃', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuPlanningScreen()));
+                  }),
+                  _buildDrawerItem(Icons.play_circle_fill, '開始運動', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const StartWorkoutScreen()));
+                  }),
+                  _buildDrawerItem(Icons.restaurant, '飲食規劃', () {
+                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const DietPlanningScreen()));
+                  }),
+                  _buildDrawerItem(Icons.menu_book, '動作教學', () {
+                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const TutorialScreen()));
+                  }),
+                  _buildDrawerItem(Icons.history, '運動紀錄', () {
+                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen()));
+                  }),
+                  _buildDrawerItem(Icons.monitor_weight, '體態紀錄', () {
+                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const WeightScreen()));
+                  }),
+                ],
+
+                // --- 👔 教練專屬功能區 ---
+                if (role == 'coach') ...[
+                  _buildDrawerItem(Icons.analytics, '學員進度追蹤', () {
+                    // 導向教練管理頁面
+                  }),
+                  _buildDrawerItem(Icons.chat_bubble, '學員訊息回覆', () {
+                    // 導向對話清單
+                  }),
+                  _buildDrawerItem(Icons.assignment, '指派新菜單', () {
+                    // 導向指派頁面
+                  }),
+                ],
+
+                const Divider(color: Colors.white24),
+
+                // 共通功能
+                _buildDrawerItem(Icons.settings, '帳戶設置', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+                }),
+                _buildDrawerItem(Icons.logout, '登出', () async {
+                  await FirebaseAuth.instance.signOut();
+                }),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+          body: role == 'coach' ? _buildCoachHome() : _buildUserHome(name), // 根據身分切換主畫面
+        );
+      },
     );
+  }
+
+  Widget _buildUserHome(String name) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      // ... 放置原本的訓練建議與開始按鈕代碼 ...
+    );
+  }
+
+  // 預留給教練的介面
+  Widget _buildCoachHome() {
+    return const Center(child: Text("教練後台：目前尚無學員提問", style: TextStyle(fontSize: 18)));
   }
 
   // 建立側邊欄選項的小工具

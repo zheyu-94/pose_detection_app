@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isLoginMode = true; // 切換登入或註冊模式
 
+  String _selectedRole = 'user'; // 預設是學員
+
   Future<void> _submit() async {
     setState(() => _isLoading = true);
     try {
@@ -26,24 +29,34 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
       } else {
-        // 註冊邏輯
-        await _auth.createUserWithEmailAndPassword(
+        // 註冊邏輯 - 這裡只呼叫「一次」建立帳號
+        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-      }
-      // 成功的話，main.dart 的 StreamBuilder 會自動偵測到並跳轉畫面！
-    } on FirebaseAuthException catch (e) {
-      String message = '發生錯誤';
-      if (e.code == 'user-not-found') message = '找不到此信箱的帳號';
-      if (e.code == 'wrong-password') message = '密碼錯誤';
-      if (e.code == 'email-already-in-use') message = '此信箱已被註冊';
 
+        // 成功後立即將身分寫入資料庫
+        if (userCredential.user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .set({
+            'email': _emailController.text.trim(),
+            'role': _selectedRole, // 'user' 或 'coach'
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+      // 成功後，main.dart 的 StreamBuilder 會自動帶你進入首頁
+    } on FirebaseAuthException catch (e) {
+      String message = e.message ?? '發生錯誤';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
         );
       }
+    } catch (e) {
+      print("Firestore 寫入錯誤: $e"); // 這行能幫你在 Debug Console 看到具體原因
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -107,6 +120,39 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 30),
+
+              if (!_isLoginMode) ...[
+                const SizedBox(height: 20),
+                const Text("請選擇您的身分：", style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text("我是學員")),
+                        selected: _selectedRole == 'user',
+                        onSelected: (selected) {
+                          if (selected) setState(() => _selectedRole = 'user');
+                        },
+                        selectedColor: Colors.blueAccent,
+                        labelStyle: TextStyle(color: _selectedRole == 'user' ? Colors.white : Colors.white54),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text("我是教練")),
+                        selected: _selectedRole == 'coach',
+                        onSelected: (selected) {
+                          if (selected) setState(() => _selectedRole = 'coach');
+                        },
+                        selectedColor: Colors.blueAccent,
+                        labelStyle: TextStyle(color: _selectedRole == 'coach' ? Colors.white : Colors.white54),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
 
               // 登入/註冊按鈕
               SizedBox(
