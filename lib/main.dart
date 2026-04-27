@@ -7,6 +7,7 @@ import 'screens/training_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
+import 'package:pose_detection_app/screens/tutorial_screen.dart'; // 🌟 導入你寫好的教學頁面
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -112,8 +113,7 @@ class _MainLayoutState extends State<MainLayout> {
                     // Navigator.push(context, MaterialPageRoute(builder: (context) => const DietPlanningScreen()));
                   }),
                   _buildDrawerItem(Icons.menu_book, '動作教學', () {
-                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const TutorialScreen()));
-                  }),
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const TutorialScreen()));                  }),
                   _buildDrawerItem(Icons.history, '運動紀錄', () {
                     // Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen()));
                   }),
@@ -154,15 +154,131 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   Widget _buildUserHome(String name) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      // ... 放置原本的訓練建議與開始按鈕代碼 ...
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.fitness_center, size: 80, color: Colors.blueAccent),
+          const SizedBox(height: 20),
+          Text("歡迎回來，$name！", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          const Text("請點擊左上角選單，開始你的訓練", style: TextStyle(fontSize: 16, color: Colors.white70)),
+        ],
+      ),
     );
   }
 
   // 預留給教練的介面
   Widget _buildCoachHome() {
-    return const Center(child: Text("教練後台：目前尚無學員提問", style: TextStyle(fontSize: 18)));
+    return StreamBuilder<QuerySnapshot>(
+      // 監聽 'questions' 集合，並依照時間排序（最新的提問在最上面）
+      stream: FirebaseFirestore.instance
+          .collection('questions')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // 1. 正在讀取中
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // 2. 如果沒有資料，或資料庫裡是空的
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text("教練後台：目前尚無學員提問 🎉", style: TextStyle(fontSize: 18)));
+        }
+
+        // 3. 抓到資料了！把文件轉換成列表
+        final questions = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(10),
+          itemCount: questions.length,
+          itemBuilder: (context, index) {
+            // 取得單筆提問的資料
+            var qDoc = questions[index];
+            var data = qDoc.data() as Map<String, dynamic>;
+
+            return Card(
+              color: Colors.grey[850], // 深色模式的卡片顏色
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                leading: const Icon(Icons.help_outline, color: Colors.orangeAccent, size: 30),
+                title: Text("詢問動作：${data['exerciseName'] ?? '未知動作'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 5),
+                    Text("學員問說：${data['content'] ?? ''}", style: const TextStyle(color: Colors.white70, fontSize: 15)),
+                    const SizedBox(height: 5),
+                    Text("狀態：${data['isReplied'] == true ? '✅ 已回覆' : '⏳ 等待教練回覆'}",
+                        style: TextStyle(color: data['isReplied'] == true ? Colors.green : Colors.redAccent, fontWeight: FontWeight.bold)
+                    ),
+                  ],
+                ),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                  onPressed: () {
+                    _showReplyDialog(
+                      context,
+                      qDoc.id,
+                      data['content'] ?? ""
+                    );
+                  },
+                  child: const Text("回覆", style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 🌟 新增：教練回覆彈窗
+  void _showReplyDialog(BuildContext context, String docId, String currentQuestion) {
+    final TextEditingController _replyController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("回覆學員提問"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("問題內容：\n$currentQuestion", style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _replyController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: "請輸入你的專業建議...",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
+          ElevatedButton(
+            onPressed: () async {
+              if (_replyController.text.trim().isEmpty) return;
+
+              // 🌟 更新 Firestore 資料
+              await FirebaseFirestore.instance.collection('questions').doc(docId).update({
+                'replyContent': _replyController.text.trim(), // 教練回覆內容
+                'isReplied': true,                            // 標記已回覆
+                'replyTime': FieldValue.serverTimestamp(),    // 回覆時間
+              });
+
+              if (context.mounted) Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ 回覆成功！")));
+            },
+            child: const Text("送出回覆"),
+          ),
+        ],
+      ),
+    );
   }
 
   // 建立側邊欄選項的小工具

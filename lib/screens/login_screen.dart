@@ -41,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
               .collection('users')
               .doc(userCredential.user!.uid)
               .set({
+            'uid': userCredential.user!.uid,
             'email': _emailController.text.trim(),
             'role': _selectedRole, // 'user' 或 'coach'
             'createdAt': FieldValue.serverTimestamp(),
