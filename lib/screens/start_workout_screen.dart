@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'training_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StartWorkoutScreen extends StatefulWidget {
   const StartWorkoutScreen({super.key});
@@ -21,16 +22,18 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
   }
 
   Future<void> _fetchWorkoutForDate() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() { _isLoading = true; });
+
+    // 🌟 獲取當前使用者 UID
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
     String dateString = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
     try {
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc('test_user')
+          .doc(user.uid)
           .collection('daily_workouts')
           .doc(dateString)
           .get();
@@ -55,18 +58,21 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
   }
 
   Future<void> _updateWorkoutInFirebase() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     String dateString = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
     try {
       await FirebaseFirestore.instance
           .collection('users')
-          .doc('test_user')
+          .doc(user.uid) // 👈 改這裡：'test_user' -> user.uid
           .collection('daily_workouts')
           .doc(dateString)
           .update({
         'exercises': _todayWorkout,
       });
-      debugPrint("✅ 雲端資料同步更新成功！");
+      debugPrint("✅ 雲端資料同步成功！");
     } catch (e) {
       debugPrint("❌ 更新失敗: $e");
     }
@@ -80,7 +86,6 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
   // 🌟 新增：執行訓練的核心邏輯
   Future<void> _startTrainingProcess() async {
     int nextIndex = _getNextUncompletedIndex();
-
     if (nextIndex == -1) return; // 已經全數完成了，不做事
 
     String exerciseName = _todayWorkout[nextIndex]['name'];
@@ -88,37 +93,41 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
     // 1. 導航到訓練畫面，並且「等待 (await)」它回傳結果
     final bool? isFinished = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => TrainingScreen(exerciseName: exerciseName),
-      ),
+      MaterialPageRoute(builder: (context) => TrainingScreen(exerciseName: exerciseName)),
     );
 
     // 2. 如果回傳 true，代表該動作順利完成
     if (isFinished == true && context.mounted) {
       setState(() {
-        _todayWorkout[nextIndex]['isCompleted'] = true; // 在本機端打勾
+        _todayWorkout[nextIndex]['isCompleted'] = true;
       });
 
-      // 3. 同步到 Firebase
+      // A. 更新每日菜單進度 (剛剛改好的 UID 版)
       await _updateWorkoutInFirebase();
 
-      // 4. 檢查是否還有下一個動作
-      int checkNext = _getNextUncompletedIndex();
-      if (checkNext != -1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ $exerciseName 完成！準備進入：${_todayWorkout[checkNext]['name']}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 太棒了！今日菜單全數完成！'),
-            backgroundColor: Colors.orangeAccent,
-          ),
-        );
+      // 🌟 B. 同時新增到「運動紀錄 (workouts)」集合中
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        String todayStr = "${DateTime
+            .now()
+            .year}-${DateTime
+            .now()
+            .month
+            .toString()
+            .padLeft(2, '0')}-${DateTime
+            .now()
+            .day
+            .toString()
+            .padLeft(2, '0')}";
+
+        await FirebaseFirestore.instance.collection('workouts').add({
+          'uid': user.uid,
+          'exerciseName': exerciseName,
+          'reps': (_todayWorkout[nextIndex]['sets'] ?? 1) *
+              (_todayWorkout[nextIndex]['reps'] ?? 0),
+          'date': todayStr,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
       }
     }
   }

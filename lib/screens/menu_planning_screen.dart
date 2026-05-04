@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MenuPlanningScreen extends StatefulWidget {
   const MenuPlanningScreen({super.key});
@@ -56,6 +57,13 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
   // 🌟 新增 2：儲存到 Firebase 的函數
   // 🌟 修正版：儲存到 Firebase 的函數 (解決陣列覆蓋問題)
   Future<void> _saveWorkoutPlanToFirebase() async {
+    // 🌟 1. 取得現在登入的用戶
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint("❌ 尚未登入");
+      return;
+    }
+
     String dateString = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
     List<Map<String, dynamic>> exercisesToSave = _selectedExercises.map((exerciseName) {
@@ -70,7 +78,7 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
     try {
       final docRef = FirebaseFirestore.instance
           .collection('users')
-          .doc('test_user')
+          .doc(user.uid) //
           .collection('daily_workouts')
           .doc(dateString);
 

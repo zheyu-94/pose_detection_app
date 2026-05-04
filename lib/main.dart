@@ -10,6 +10,7 @@ import 'screens/profile_screen.dart';
 import 'package:pose_detection_app/screens/tutorial_screen.dart'; // 🌟 導入你寫好的教學頁面
 import 'screens/weight_screen.dart'; // 🌟 告訴 main 去哪裡找體態紀錄
 import 'screens/diet_planning_screen.dart'; // 🌟 告訴 main 去哪裡找飲食規劃
+import 'screens/workout_history_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -134,15 +135,23 @@ class _MainLayoutState extends State<MainLayout> {
                     }
                   }),
                   _buildDrawerItem(Icons.menu_book, '動作教學', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const TutorialScreen()));                  }),
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const TutorialScreen())
+                    );
+                  }),
                   _buildDrawerItem(Icons.history, '運動紀錄', () {
-                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WorkoutHistoryScreen()) // 🌟 這裡改成我們剛做好的頁面
+                    );
                   }),
                   _buildDrawerItem(Icons.monitor_weight, '體態紀錄', () {
                     Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const WeightScreen())
-                    );                  }),
+                    );
+                  }),
                 ],
 
                 // --- 👔 教練專屬功能區 ---
