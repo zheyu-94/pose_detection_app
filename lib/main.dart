@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'package:pose_detection_app/screens/tutorial_screen.dart'; // 🌟 導入你寫好的教學頁面
+import 'screens/weight_screen.dart'; // 🌟 告訴 main 去哪裡找體態紀錄
+import 'screens/diet_planning_screen.dart'; // 🌟 告訴 main 去哪裡找飲食規劃
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +112,26 @@ class _MainLayoutState extends State<MainLayout> {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const StartWorkoutScreen()));
                   }),
                   _buildDrawerItem(Icons.restaurant, '飲食規劃', () {
-                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const DietPlanningScreen()));
+                    if (userData['weight'] == null ||
+                        userData['height'] == null ||
+                        userData['age'] == null ||
+                        userData['gender'] == null) {
+
+                      // 1. 彈出貼心提示
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("請先填寫體態紀錄，AI 才能幫你精準計算專屬熱量喔！🍔"),
+                          backgroundColor: Colors.orangeAccent,
+                        ),
+                      );
+
+                      // 2. 直接強制把他帶到「體態紀錄」畫面
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const WeightScreen()));
+
+                    } else {
+                      // 如果資料都有了，就正常放行進入飲食規劃
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const DietPlanningScreen()));
+                    }
                   }),
                   _buildDrawerItem(Icons.menu_book, '動作教學', () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const TutorialScreen()));                  }),
@@ -118,8 +139,10 @@ class _MainLayoutState extends State<MainLayout> {
                     // Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen()));
                   }),
                   _buildDrawerItem(Icons.monitor_weight, '體態紀錄', () {
-                    // Navigator.push(context, MaterialPageRoute(builder: (context) => const WeightScreen()));
-                  }),
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WeightScreen())
+                    );                  }),
                 ],
 
                 // --- 👔 教練專屬功能區 ---
