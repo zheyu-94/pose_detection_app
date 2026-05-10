@@ -82,8 +82,7 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
   }
 
   // 獨立出一個「完成動作並寫入歷史紀錄」的通用函數
-  // 獨立出一個「完成動作並寫入歷史紀錄」的通用函數
-  Future<void> _markAsCompletedAndSave(int index, {bool isRest = false, int? calories}) async {
+  Future<void> _markAsCompletedAndSave(int index, {bool isRest = false, int? calories, int? actualReps}) async {
     setState(() {
       _todayWorkout[index]['isCompleted'] = true;
     });
@@ -140,7 +139,8 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
       } else if (calories != null) {
         historyData['calories'] = calories;
       } else {
-        historyData['reps'] = (_todayWorkout[index]['sets'] ?? 1) * (_todayWorkout[index]['reps'] ?? 0);
+        // 💡 這裡會優先使用傳入的真實次數 (actualReps)，如果沒有才用預設計算！
+        historyData['reps'] = actualReps ?? ((_todayWorkout[index]['sets'] ?? 1) * (_todayWorkout[index]['reps'] ?? 0));
       }
 
       await FirebaseFirestore.instance.collection('workouts').add(historyData);
@@ -212,13 +212,25 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
     }
 
     // 情況 3：一般重量訓練
-    final bool? isFinished = await Navigator.push(
+    final dynamic result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => TrainingScreen(exerciseName: exerciseName)),
     );
 
-    if (isFinished == true && context.mounted) {
-      await _markAsCompletedAndSave(nextIndex);
+    // 只要有回傳值，且不是 false（代表不是按取消離開的）
+    if (result != null && result != false && context.mounted) {
+      int actualReps;
+
+      // 檢查收到的 result 是不是數字
+      if (result is int) {
+        actualReps = result;
+      } else {
+        // 防呆機制：萬一還是收到 true，就用預設計算
+        actualReps = (_todayWorkout[nextIndex]['sets'] ?? 1) * (_todayWorkout[nextIndex]['reps'] ?? 0);
+      }
+
+      // 將真實次數傳進去存檔
+      await _markAsCompletedAndSave(nextIndex, actualReps: actualReps);
     }
   }
 

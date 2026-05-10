@@ -57,6 +57,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   int _currentSet = 0;
   bool _hasAiDetection = true;
+  int _totalRepsDone = 0;
 
   @override
   void initState() {
@@ -570,7 +571,40 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       children: [
                         Row(
                           children: [
-                            IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context, true)),
+                            IconButton(
+                                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                                onPressed: () async {
+                                  // 如果已經開始做動作，或者已經練完幾組了，就跳出警告
+                                  if (_repCounter > 0 || _currentSet > 0) {
+                                    bool? exit = await showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        backgroundColor: Colors.grey[900],
+                                        title: const Text("確定要離開？", style: TextStyle(color: Colors.white)),
+                                        content: const Text("目前的訓練進度將不會被儲存。", style: TextStyle(color: Colors.white70)),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text("取消", style: TextStyle(color: Colors.white70))
+                                          ),
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: const Text("確定離開", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    // 如果使用者點擊「確定離開」，才真的退出並回傳 false (不存檔)
+                                    if (exit == true) {
+                                      if (context.mounted) Navigator.pop(context, false);
+                                    }
+                                  } else {
+                                    // 如果連 1 下都還沒做，就直接退出，不囉嗦
+                                    Navigator.pop(context, false);
+                                  }
+                                }
+                            ),
                             Expanded(child: Center(child: Text(widget.exerciseName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)))),
                             IconButton(icon: const Icon(Icons.info_outline, color: Colors.white), onPressed: () => _checkAndShowTutorial(forceShow: true)),
                           ],
@@ -636,50 +670,54 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)
                                 ),
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.7), elevation: 0),
-                                  onPressed: () async {
-                                    // 顯示個小提示讓使用者知道有按到
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(_currentSet < 2 ? '這組完成！' : '訓練完成，正在儲存...'),
-                                          duration: const Duration(seconds: 1)
-                                      ),
-                                    );
+                                onPressed: () async {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(_currentSet < 2 ? '這組完成！' : '訓練完成，正在儲存...'),
+                                        duration: const Duration(seconds: 1)
+                                    ),
+                                  );
 
-                                    if (_currentSet < 2) {
-                                      // === 還沒練滿 3 組：換組並重置 ===
-                                      setState(() {
-                                        _currentSet++;
-                                        _repCounter = 0;
-                                        _primaryAngle = 0;
+                                  if (_currentSet < 2) {
+                                    // === 還沒練滿 3 組：換組並重置 ===
+                                    setState(() {
+                                      // 💡 關鍵：把這組做的次數加進總數裡！
+                                      _totalRepsDone += _repCounter;
 
-                                        // 重置所有教練
-                                        _bicepTrainer.reset();
-                                        _squatTrainer.reset();
-                                        _shoulderPressTrainer.reset();
-                                        _inclineTrainer.reset();
-                                        _rdlTrainer.reset();
-                                        _barbellRowTrainer.reset();
-                                        _benchPressTrainer.reset();
-                                        _tricepTrainer.reset();
+                                      _currentSet++;
+                                      _repCounter = 0;
+                                      _primaryAngle = 0;
 
-                                        _feedbackMessage = "休息一下！準備開始第 ${_currentSet + 1} 組";
-                                      });
-                                    } else {
-                                      // === 練滿 3 組了：準備離開 ===
-                                      setState(() {
-                                        _currentSet = 3;
-                                        _canProcess = false; // 停止 AI 運算
-                                      });
+                                      // 重置所有教練
+                                      _bicepTrainer.reset();
+                                      _squatTrainer.reset();
+                                      _shoulderPressTrainer.reset();
+                                      _inclineTrainer.reset();
+                                      _rdlTrainer.reset();
+                                      _barbellRowTrainer.reset();
+                                      _benchPressTrainer.reset();
+                                      _tricepTrainer.reset();
 
-                                      // 稍等半秒，讓畫面把第三顆綠色圈圈亮起來
-                                      await Future.delayed(const Duration(milliseconds: 500));
+                                      _feedbackMessage = "休息一下！準備開始第 ${_currentSet + 1} 組";
+                                    });
+                                  } else {
+                                    // === 練滿 3 組了：準備離開 ===
+                                    setState(() {
+                                      // 💡 關鍵：把最後一組的次數也加進總數裡！
+                                      _totalRepsDone += _repCounter;
 
-                                      // 關鍵：帶著 true 退回上一頁，讓 start_workout_screen 去更新 Firebase！
-                                      if (context.mounted) {
-                                        Navigator.pop(context, true);
-                                      }
+                                      _currentSet = 3;
+                                      _canProcess = false;
+                                    });
+
+                                    await Future.delayed(const Duration(milliseconds: 500));
+
+                                    if (context.mounted) {
+                                      // 💡 最關鍵：不再回傳 true，而是把你真實做完的「總次數」傳回去！
+                                      Navigator.pop(context, _totalRepsDone);
                                     }
-                                  },
+                                  }
+                                },
                               ),
                             ),
                           ),
