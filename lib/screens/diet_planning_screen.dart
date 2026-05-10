@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // 🌟 用來處理日期格式
+import 'package:intl/intl.dart';
 
 class DietPlanningScreen extends StatefulWidget {
   const DietPlanningScreen({super.key});
@@ -11,10 +11,10 @@ class DietPlanningScreen extends StatefulWidget {
 }
 
 class _DietPlanningScreenState extends State<DietPlanningScreen> {
-  // 取得今天的日期字串 (例如: 2023-12-25)
+  // 取得今天的日期字串
   String get _todayDate => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-  // 🌟 彈出新增飲食的對話框
+  // 彈出新增飲食的對話框
   void _showAddMealDialog() {
     final nameController = TextEditingController();
     final calController = TextEditingController();
@@ -107,7 +107,7 @@ class _DietPlanningScreenState extends State<DietPlanningScreen> {
                   // --- 下方飲食清單 ---
                   Expanded(
                     child: meals.isEmpty
-                        ? const Center(child: Text("今天還沒吃東西喔 🥗", style: TextStyle(color: Colors.white54)))
+                        ? const Center(child: Text("今天還沒吃東西喔", style: TextStyle(color: Colors.white54)))
                         : ListView.builder(
                       itemCount: meals.length,
                       itemBuilder: (context, index) {
@@ -169,7 +169,7 @@ class _DietPlanningScreenState extends State<DietPlanningScreen> {
           const SizedBox(height: 20),
           Text("每日目標：${target.round()} kcal", style: const TextStyle(fontSize: 16, color: Colors.white70)),
           if (eaten > target)
-            const Text("\n⚠️ 熱量爆表啦！明天要多動一點喔！", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            const Text("\n 熱量爆表啦！明天要多動一點喔！", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
         ],
       ),
     );

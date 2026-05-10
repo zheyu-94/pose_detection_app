@@ -116,8 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🌟 這裡直接使用 widget.userName
-              Text("早安，${widget.userName}！💪", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              // 這裡直接使用 widget.userName
+              Text("早安，${widget.userName}！", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
               const Text("今天準備好突破自己了嗎？", style: TextStyle(color: Colors.grey, fontSize: 13)),
             ],

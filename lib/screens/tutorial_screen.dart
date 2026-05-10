@@ -12,12 +12,12 @@ class ExerciseInfo {
 }
 
 // ==========================================
-// 1️⃣ 第一層：動作教學百科 (部位分類 - 包含休息)
+// 1️.第一層：動作教學百科 (部位分類 - 包含休息)
 // ==========================================
 class TutorialScreen extends StatelessWidget {
   const TutorialScreen({super.key});
 
-  // 🌟 加入了「休息」選項
+  // 加入了「休息」選項
   final List<String> categories = const ['胸部', '背部', '肩部', '腿部', '手部', '核心', '有氧', '休息'];
 
   @override
@@ -79,7 +79,7 @@ class TutorialScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 2️⃣ 第二層：動作清單畫面
+// 2️.第二層：動作清單畫面
 // ==========================================
 class ExerciseListScreen extends StatelessWidget {
   final String category;
@@ -196,7 +196,7 @@ class ExerciseListScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 3️⃣ 第三層：動作詳情與 Q&A 畫面 (保留清晰的對話泡泡設計)
+// 3️.第三層：動作詳情與 Q&A 畫面 (保留清晰的對話泡泡設計)
 // ==========================================
 class ExerciseDetailScreen extends StatelessWidget {
   final ExerciseInfo exercise;
@@ -283,7 +283,7 @@ class ExerciseDetailScreen extends StatelessWidget {
             height: 200,
             width: double.infinity,
             color: Colors.grey[900],
-            // 🌟 休息分類的影片區域圖示換成床鋪或食物，更有感覺
+            // 休息分類的影片區域圖示換成床鋪或食物，更有感覺
             child: Icon(
                 isRest ? Icons.local_dining : Icons.videocam,
                 size: 50,
@@ -295,7 +295,7 @@ class ExerciseDetailScreen extends StatelessWidget {
             child: Text(exercise.description, style: const TextStyle(fontSize: 16, height: 1.5)),
           ),
 
-          // 🌟 Q&A 歷史紀錄區塊
+          // Q&A 歷史紀錄區塊
           Expanded(
             child: user == null
                 ? const SizedBox()

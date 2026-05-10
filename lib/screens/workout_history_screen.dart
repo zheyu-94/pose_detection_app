@@ -172,7 +172,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
 
                 var docs = snapshot.data!.docs;
 
-                // 核心修改：如果這天沒有任何運動紀錄，顯示「自動設為休息日」
+                // 如果這天沒有任何運動紀錄，自動設為休息日
                 if (docs.isEmpty) {
                   return Center(
                     child: Column(

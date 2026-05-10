@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import '../data/exercise_dictionary.dart';
 
 import '../trainers/bicep_trainer.dart';
 import '../trainers/squat_trainer.dart';
@@ -80,9 +81,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
         !widget.exerciseName.contains('屈伸') &&
         !widget.exerciseName.contains('臥推')) {
 
-      setState(() { // 記得要有 setState 才會更新畫面喔
+      setState(() { // 有 setState 才會更新畫面
         _hasAiDetection = false;
-        _feedbackMessage = "📝 此動作無 AI 計數，請自主訓練並手動儲存";
+        _feedbackMessage = "此動作無 AI 計數，請自主訓練並手動儲存";
       });
     }
   }
@@ -127,14 +128,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   String _getTutorialText(String name) {
-    if (name.contains('飛鳥')) {
-      return "1. 雙手微彎固定角度，像抱一棵大樹。\n2. 感受胸肌拉伸，下放至胸口微酸。\n3. 胸肌發力將啞鈴夾回起點，不需互相碰撞。";
-    } else if (name.contains('深蹲')) {
-      return "1. 雙腳與肩同寬，腳尖微朝外。\n2. 核心收緊，臀部向後坐下。\n3. 大腿與地面平行後，用臀腿力量站起。";
-    } else if (name.contains('肩推')) {
-      return "1. 啞鈴起點在肩膀兩側，手肘微收。\n2. 核心出力向上推舉，頂部不需鎖死。\n3. 控制速度慢慢下放至耳朵高度。";
-    }
-    return "1. 保持核心收緊，維持身體穩定。\n2. 動作放慢，感受目標肌肉發力。\n3. 注意呼吸，發力時吐氣，下放時吸氣。";
+    return ExerciseDictionary.get(name);
   }
 
   Future<void> _initTts() async {
@@ -143,7 +137,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     await flutterTts.setVolume(1.0);
   }
 
-  // 🌟 修好的相機初始化，防當機、防黑屏
+  // 修好的相機初始化，防當機、防黑屏
   Future<void> _initCamera() async {
     try {
       _cameras = await availableCameras();
@@ -163,7 +157,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         setState(() { _isCameraInitialized = true; });
 
         _cameraController!.startImageStream((CameraImage image) {
-          // 💡 瘋狂印出狀態，看是不是卡在某個布林值
+          // 瘋狂印出狀態，看是不是卡在某個布林值
           debugPrint("🔄 收到影格! isBusy: $_isBusy");
           if (_isBusy) return;
           _isBusy = true;
@@ -173,7 +167,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     } catch (e) { debugPrint("❌ 相機初始化失敗: $e"); }
   }
 
-  // 🌟 處理圖片邏輯
+  // 處理圖片邏輯
   Future<void> _processImage(CameraImage image) async {
     debugPrint("📸 進入 _processImage！圖片格式 raw: ${image.format.raw}");
 
@@ -193,13 +187,13 @@ class _TrainingScreenState extends State<TrainingScreen> {
       if (mounted) {
         setState(() {
           if (poses.isNotEmpty) {
-            // 👇 就是這裡！在最後面補上 CameraLensDirection.front
+            // 補上 CameraLensDirection.front
             _customPaint = CustomPaint(
                 painter: PosePainter(
                   poses,
                   inputImage.metadata!.size,
                   inputImage.metadata!.rotation,
-                  CameraLensDirection.front, // 👈 補上第 4 個參數！
+                  CameraLensDirection.front,
                 )
             );
             _delegateToTrainer(poses.first);
@@ -216,7 +210,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     }
   }
 
-  // 🌟 修好的格式轉換，完美支援所有手機
+  // 修好的格式轉換，完美支援所有手機
   InputImage? _inputImageFromCameraImage(CameraImage image) {
     if (_cameras == null || _cameras!.isEmpty) return null;
     final camera = _cameras!.firstWhere(
@@ -238,7 +232,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final int width = image.width;
     final int height = image.height;
 
-    // 💡 算出 ML Kit 嚴格要求的「完美陣列長度」 (長 x 寬 x 1.5)
+    // 算出 ML Kit 嚴格要求的「完美陣列長度」 (長 x 寬 x 1.5)
     final int ySize = width * height;
     final int uvSize = ySize ~/ 2;
     final Uint8List nv21Bytes = Uint8List(ySize + uvSize);
@@ -246,7 +240,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final Uint8List yPlane = image.planes[0].bytes;
     final int stride = image.planes[0].bytesPerRow; // 包含 padding 的實際寬度
 
-    // 🌟 核心魔法：一行一行複製，把手機相機偷偷加的 Padding 剪掉！
+    // 核心魔法：一行一行複製，把手機相機偷偷加的 Padding 剪掉！
     for (int y = 0; y < height; y++) {
       final int srcOffset = y * stride;
       final int dstOffset = y * width;
@@ -264,15 +258,15 @@ class _TrainingScreenState extends State<TrainingScreen> {
       size: imageSize,
       rotation: rotation,
       format: InputImageFormat.nv21,
-      // 💡 這裡非常重要！既然我們剪掉了 padding，現在的跨步寬度就等於真正的 width！
+      //
       bytesPerRow: width,
     );
 
     return InputImage.fromBytes(bytes: nv21Bytes, metadata: imageMetadata);
   }
 
-  // 🌟 AI 派發中心
-  // 🌟 AI 派發中心
+  // AI 派發中心
+
   void _delegateToTrainer(Pose pose) {
     if (widget.exerciseName.contains('二頭') || widget.exerciseName.contains('彎舉')) {
       _processBicep(pose);
@@ -370,7 +364,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
       _repCounter = _shoulderPressTrainer.counter;
       _feedbackMessage = _shoulderPressTrainer.feedback;
 
-      bool isWarning = _feedbackMessage.contains('⚠️');
+      bool isWarning = _feedbackMessage.contains('!!!');
       _updateFeedbackColor(_feedbackMessage, isWarning: isWarning);
       _speakIfNeeded(_feedbackMessage, isWarning: isWarning);
     }
@@ -396,7 +390,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
       _repCounter = _inclineTrainer.counter;
       _feedbackMessage = _inclineTrainer.feedback;
-      bool isWarning = _feedbackMessage.contains('⚠️');
+      bool isWarning = _feedbackMessage.contains('!!!');
       _updateFeedbackColor(_feedbackMessage, isWarning: isWarning);
       _speakIfNeeded(_feedbackMessage, isWarning: isWarning);
     }
@@ -411,14 +405,13 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final knee = pose.landmarks[PoseLandmarkType.rightKnee];
 
     if (shoulder != null && hip != null && knee != null) {
-      // 👇 把這行加上去！利用剛公開的 calculateAngle 來算髖關節角度
       _primaryAngle = _rdlTrainer.calculateAngle(shoulder, hip, knee);
     }
 
     _repCounter = _rdlTrainer.counter;
     _feedbackMessage = _rdlTrainer.feedbackMessage;
 
-    bool isWarning = _feedbackMessage.contains('⚠️');
+    bool isWarning = _feedbackMessage.contains('!!!');
     _updateFeedbackColor(_feedbackMessage, isWarning: isWarning);
     _speakIfNeeded(_feedbackMessage, isWarning: isWarning);
   }
@@ -439,7 +432,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
     _repCounter = _barbellRowTrainer.counter;
     _feedbackMessage = _barbellRowTrainer.feedbackMessage;
 
-    // 如果你有寫 isBadForm 的判斷
     _updateFeedbackColor(_feedbackMessage, isWarning: _barbellRowTrainer.isBadForm);
     _speakIfNeeded(_feedbackMessage, isWarning: _barbellRowTrainer.isBadForm);
   }
@@ -660,14 +652,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                         _repCounter = 0;
                                         _primaryAngle = 0;
 
-                                        // 重置所有教練 (包含你可能漏掉的)
+                                        // 重置所有教練
                                         _bicepTrainer.reset();
                                         _squatTrainer.reset();
                                         _shoulderPressTrainer.reset();
                                         _inclineTrainer.reset();
                                         _rdlTrainer.reset();
-                                        _barbellRowTrainer.reset(); // 加上划船
-                                        _benchPressTrainer.reset(); // 加上臥推
+                                        _barbellRowTrainer.reset();
+                                        _benchPressTrainer.reset();
                                         _tricepTrainer.reset();
 
                                         _feedbackMessage = "休息一下！準備開始第 ${_currentSet + 1} 組";
@@ -682,7 +674,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                       // 稍等半秒，讓畫面把第三顆綠色圈圈亮起來
                                       await Future.delayed(const Duration(milliseconds: 500));
 
-                                      // 🌟 關鍵：帶著 true 退回上一頁，讓 start_workout_screen 去更新 Firebase！
+                                      // 關鍵：帶著 true 退回上一頁，讓 start_workout_screen 去更新 Firebase！
                                       if (context.mounted) {
                                         Navigator.pop(context, true);
                                       }

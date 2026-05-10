@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart'; // 🌟 引入圖表套件
+import 'package:fl_chart/fl_chart.dart';
 
 class WeightScreen extends StatefulWidget {
   const WeightScreen({super.key});
@@ -18,7 +18,7 @@ class _WeightScreenState extends State<WeightScreen> {
 
   String _selectedGender = '男';
   double _activityLevel = 1.2;
-  int _selectedDays = 7; // 🌟 預設顯示 7 天內的數據
+  int _selectedDays = 7; // 預設顯示 7 天內的數據
 
   final List<Map<String, dynamic>> _activityOptions = [
     {'label': '久坐 (不運動)', 'value': 1.2},
@@ -59,7 +59,7 @@ class _WeightScreenState extends State<WeightScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ 紀錄成功！")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("紀錄成功！")));
         _weightController.clear(); // 存完清空體重欄位
       }
     } catch (e) {
@@ -110,9 +110,9 @@ class _WeightScreenState extends State<WeightScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 10),
-                const Text("📉 體重變化趨勢", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                const Text("體重變化趨勢", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
 
-                // 🌟 時間區間選擇按鈕
+                // 時間區間選擇按鈕
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -128,7 +128,7 @@ class _WeightScreenState extends State<WeightScreen> {
                   ),
                 ),
 
-                // 🌟 讀取 Firestore 資料並畫圖
+                // 讀取 Firestore 資料並畫圖
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
@@ -156,7 +156,7 @@ class _WeightScreenState extends State<WeightScreen> {
                         return Center(child: Text("這 $_selectedDays 天內沒有紀錄喔！", style: const TextStyle(color: Colors.white54)));
                       }
 
-                      // 🌟 2. 核心修正：將同一天的數據去重，只保留最新的一筆！
+                      // 2. 核心修正：將同一天的數據去重，只保留最新的一筆！
                       Map<String, double> dailyWeights = {};
                       for (var doc in filteredDocs) {
                         var data = doc.data() as Map<String, dynamic>;
