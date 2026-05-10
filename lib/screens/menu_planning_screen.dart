@@ -10,10 +10,10 @@ class MenuPlanningScreen extends StatefulWidget {
 }
 
 class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
-  // 🌟 1. 專業級動作資料庫 (完美移植妳的圖片分類)
+  // 1. 動作資料庫
   final Map<String, Map<String, List<String>>> _exerciseDatabase = {
     '胸': {
-      '上胸': ['上斜槓鈴臥推', '上斜啞鈴臥推', '低到高滑輪夾胸', '滑輪上斜夾胸', '上斜機械推'],
+      '上胸': ['上斜槓鈴臥推', '上斜啞鈴臥推', '低到高滑輪夾胸', '上斜機械胸推'],
       '中胸': ['平板槓鈴臥推', '平板啞鈴臥推', '蝴蝶機'],
       '下胸': ['雙槓臂屈伸', '高到低滑輪夾胸', '下斜胸推機'],
     },
@@ -23,11 +23,11 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
       '下背闊': ['反握槓鈴划船', '窄握高位下拉'],
     },
     '腿': {
-      '股四頭肌': ['深蹲', '腿伸肌', '分腿蹲'],
+      '股四頭肌': ['深蹲', '坐姿腿屈伸機', '分腿蹲'],
       '股二頭肌': ['羅馬尼亞硬舉', '趴姿腿彎舉', '坐姿腿彎舉'],
       '臀': ['保加利亞分腿蹲', '臀推'],
       '小腿': ['站姿提踵', '坐姿提踵'],
-      '腿推機變化': ['腿推機踩踏板下方 (股四頭肌)', '踩踏板中間 (股四頭肌+臀肌)', '踩踏板上方 (股二頭肌)', '腳踩寬 (內收肌)'],
+      '腿推機變化': ['腿推機踩踏板下方 (股四頭肌)', '腿推機踩踏板中間 (股四頭肌+臀肌)', '腿推機踩踏板上方 (股二頭肌)', '腿推機腳踩寬 (內收肌)'],
     },
     '肩': {
       '前束': ['站姿槓鈴肩推', '坐姿啞鈴肩推', '前平舉'],
@@ -35,42 +35,55 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
       '後束': ['反向夾胸機', '俯身飛鳥', '滑輪後三角飛鳥'],
     },
     '手': {
-      '二頭肌': ['W槓彎舉', '啞鈴交替彎舉', '牧師椅彎舉', '上斜啞鈴彎舉', '捶式彎舉'],
+      '二頭肌': ['W槓彎舉', '啞鈴二頭彎舉', '牧師椅二頭彎舉', '上斜啞鈴彎舉', '捶式彎舉'],
       '三頭肌': ['窄握臥推', '繩索下壓', 'W槓過頭屈伸'],
       '前臂': ['手腕彎舉', '反向手腕彎舉'],
     },
     '有氧': {
-
+      '跑步機':['跑步機'],
+      '腳踏車':['腳踏車'],
     },
     '休息': {
-
+      '睡覺覺':['休息']
     }
   };
 
-  // 2. 狀態變數 (修正重複宣告)
+  // 2. 狀態變數
   String _selectedBodyPart = '胸';
   final List<String> _selectedExercises = [];
-
-  // 🌟 新增 1：用來記錄使用者選擇的日期 (預設為今天)
   DateTime _selectedDate = DateTime.now();
 
-  // 🌟 新增 2：儲存到 Firebase 的函數
-  // 🌟 修正版：儲存到 Firebase 的函數 (解決陣列覆蓋問題)
+  // 新增：反查動作分類的小工具
+  String _getCategoryForExercise(String exerciseName) {
+    for (var mainCategory in _exerciseDatabase.keys) {
+      for (var subList in _exerciseDatabase[mainCategory]!.values) {
+        if (subList.contains(exerciseName)) {
+          return mainCategory; // 回傳 '胸', '有氧', '休息' 等等
+        }
+      }
+    }
+    return '其他';
+  }
+
+  // 儲存到 Firebase 的函數
   Future<void> _saveWorkoutPlanToFirebase() async {
-    // 🌟 1. 取得現在登入的用戶
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      debugPrint("❌ 尚未登入");
+      debugPrint("尚未登入");
       return;
     }
 
     String dateString = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
+    // 核心修改：存檔時，找出動作的 category 一併寫入
     List<Map<String, dynamic>> exercisesToSave = _selectedExercises.map((exerciseName) {
+      String category = _getCategoryForExercise(exerciseName);
+
       return {
         'name': exerciseName,
-        'sets': 3,
-        'reps': 12,
+        'category': category,
+        'sets': category == '休息' || category == '有氧' ? 1 : 3, // 有氧跟休息預設1組就好，重訓預設3組
+        'reps': category == '休息' || category == '有氧' ? 1 : 12, // 同上
         'isCompleted': false,
       };
     }).toList();
@@ -78,25 +91,20 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
     try {
       final docRef = FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid) //
+          .doc(user.uid)
           .collection('daily_workouts')
           .doc(dateString);
 
-      // 1. 先把今天的雲端資料抓下來看看
       final docSnapshot = await docRef.get();
 
       if (docSnapshot.exists && docSnapshot.data() != null && docSnapshot.data()!.containsKey('exercises')) {
-        // 2. 如果今天已經有存過動作了，我們就把舊的拿出來，新的加進去
         List<dynamic> existingExercises = docSnapshot.get('exercises');
-        existingExercises.addAll(exercisesToSave); // 追加到舊陣列後面
-
-        // 更新回資料庫
+        existingExercises.addAll(exercisesToSave);
         await docRef.update({
           'exercises': existingExercises,
           'timestamp': FieldValue.serverTimestamp(),
         });
       } else {
-        // 3. 如果今天是空的，就照原本的方式直接建立
         await docRef.set({
           'date': dateString,
           'timestamp': FieldValue.serverTimestamp(),
@@ -104,9 +112,9 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
         });
       }
 
-      debugPrint("✅ 菜單追加/儲存成功！日期：$dateString");
+      debugPrint("菜單追加/儲存成功！日期：$dateString");
     } catch (e) {
-      debugPrint("❌ 儲存失敗: $e");
+      debugPrint("儲存失敗: $e");
     }
   }
 
@@ -115,7 +123,7 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('📝 菜單規劃', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('菜單規劃', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -148,15 +156,13 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
                   },
                 );
                 if (picked != null && picked != _selectedDate) {
-                  setState(() {
-                    _selectedDate = picked;
-                  });
+                  setState(() { _selectedDate = picked; });
                 }
               },
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-                margin: const EdgeInsets.only(bottom: 15), // 修正 margin 語法
+                margin: const EdgeInsets.only(bottom: 15),
                 decoration: BoxDecoration(
                   color: Colors.blueAccent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(15),
@@ -165,7 +171,7 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('📅 選擇訓練日期', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    const Text('選擇訓練日期', style: TextStyle(color: Colors.white, fontSize: 16)),
                     Text(
                       "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
                       style: const TextStyle(color: Colors.blueAccent, fontSize: 18, fontWeight: FontWeight.bold),
@@ -239,7 +245,6 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
               width: double.infinity,
               height: 60,
               child: ElevatedButton.icon(
-                // 修正：補回 icon 和 label
                 icon: const Icon(Icons.add_task, color: Colors.white),
                 label: const Text('加入訓練菜單', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
@@ -273,7 +278,6 @@ class _MenuPlanningScreenState extends State<MenuPlanningScreen> {
     );
   }
 
-  // 🌟 動態生成清單與子標題的函數
   List<Widget> _buildExerciseList() {
     List<Widget> listItems = [];
     var subCategories = _exerciseDatabase[_selectedBodyPart]!;

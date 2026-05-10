@@ -24,7 +24,6 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
   Future<void> _fetchWorkoutForDate() async {
     setState(() { _isLoading = true; });
 
-    // 🌟 獲取當前使用者 UID
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -49,7 +48,7 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
         });
       }
     } catch (e) {
-      debugPrint("❌ 讀取失敗: $e");
+      debugPrint("讀取失敗: $e");
     } finally {
       setState(() {
         _isLoading = false;
@@ -66,88 +65,179 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
     try {
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid) // 👈 改這裡：'test_user' -> user.uid
+          .doc(user.uid)
           .collection('daily_workouts')
           .doc(dateString)
           .update({
         'exercises': _todayWorkout,
       });
-      debugPrint("✅ 雲端資料同步成功！");
+      debugPrint("雲端資料同步成功！");
     } catch (e) {
-      debugPrint("❌ 更新失敗: $e");
+      debugPrint("更新失敗: $e");
     }
   }
 
-  // 🌟 新增：找出第一個「還沒完成」的動作的索引
   int _getNextUncompletedIndex() {
     return _todayWorkout.indexWhere((exercise) => exercise['isCompleted'] != true);
   }
 
-  // 🌟 新增：執行訓練的核心邏輯
+  // 獨立出一個「完成動作並寫入歷史紀錄」的通用函數
+  // 獨立出一個「完成動作並寫入歷史紀錄」的通用函數
+  Future<void> _markAsCompletedAndSave(int index, {bool isRest = false, int? calories}) async {
+    setState(() {
+      _todayWorkout[index]['isCompleted'] = true;
+    });
+
+    // 1. 更新本日清單進度 (打勾)
+    await _updateWorkoutInFirebase();
+
+    // 2. 寫入到 workouts 歷史紀錄集合
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      String todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+
+      // 新增防呆邏輯 1：如果現在完成的是「真正的運動」，就把當天的「休息紀錄」通通清掉！
+      if (!isRest) {
+        final restRecords = await FirebaseFirestore.instance
+            .collection('workouts')
+            .where('uid', isEqualTo: user.uid)
+            .where('date', isEqualTo: todayStr)
+            .where('category', isEqualTo: '休息') // 專門抓休息的紀錄
+            .get();
+
+        for (var doc in restRecords.docs) {
+          await doc.reference.delete(); // 刪除它
+        }
+      }
+      // 新增防呆邏輯 2：如果現在是按「休息」，為了避免同一天產生多筆休息紀錄，先把舊的休息刪掉
+      else {
+        final existingRestRecords = await FirebaseFirestore.instance
+            .collection('workouts')
+            .where('uid', isEqualTo: user.uid)
+            .where('date', isEqualTo: todayStr)
+            .where('category', isEqualTo: '休息')
+            .get();
+
+        for (var doc in existingRestRecords.docs) {
+          await doc.reference.delete();
+        }
+      }
+
+      // 接著才是原本的寫入邏輯
+      String exerciseName = _todayWorkout[index]['name'];
+      String category = _todayWorkout[index]['category'] ?? (isRest ? '休息' : '運動');
+
+      Map<String, dynamic> historyData = {
+        'uid': user.uid,
+        'exerciseName': exerciseName,
+        'category': category,
+        'date': todayStr,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      if (isRest) {
+        historyData['isRest'] = true;
+      } else if (calories != null) {
+        historyData['calories'] = calories;
+      } else {
+        historyData['reps'] = (_todayWorkout[index]['sets'] ?? 1) * (_todayWorkout[index]['reps'] ?? 0);
+      }
+
+      await FirebaseFirestore.instance.collection('workouts').add(historyData);
+    }
+  }
+
+  // 有氧專用的彈出視窗
+  Future<void> _showCardioDialog(int index, String exerciseName) async {
+    TextEditingController calController = TextEditingController();
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // 避免點擊旁邊關閉
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text("完成 $exerciseName", style: const TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: calController,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "請輸入消耗的卡路里 (kcal)",
+            hintStyle: TextStyle(color: Colors.white54),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("取消", style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () async {
+              int calories = int.tryParse(calController.text) ?? 0;
+              Navigator.pop(context); // 關閉視窗
+              await _markAsCompletedAndSave(index, calories: calories); // 存檔
+            },
+            child: const Text("儲存", style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+    );
+  }
+
+  // 核心訓練邏輯
   Future<void> _startTrainingProcess() async {
     int nextIndex = _getNextUncompletedIndex();
-    if (nextIndex == -1) return; // 已經全數完成了，不做事
+    if (nextIndex == -1) return;
 
-    String exerciseName = _todayWorkout[nextIndex]['name'];
+    Map<String, dynamic> currentExercise = _todayWorkout[nextIndex];
+    String exerciseName = currentExercise['name'] ?? '';
+    String category = currentExercise['category'] ?? '';
 
-    // 1. 導航到訓練畫面，並且「等待 (await)」它回傳結果
+    // 情況 1：如果是【休息】
+    if (category == '休息' || exerciseName == '睡覺') {
+      await _markAsCompletedAndSave(nextIndex, isRest: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("💤 已記錄為休息！"), backgroundColor: Colors.orangeAccent),
+        );
+      }
+      return;
+    }
+
+    // 情況 2：如果是【有氧】
+    if (category == '有氧' || exerciseName == '跑步機' || exerciseName == '飛輪') {
+      await _showCardioDialog(nextIndex, exerciseName);
+      return;
+    }
+
+    // 情況 3：一般重量訓練
     final bool? isFinished = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => TrainingScreen(exerciseName: exerciseName)),
     );
 
-    // 2. 如果回傳 true，代表該動作順利完成
     if (isFinished == true && context.mounted) {
-      setState(() {
-        _todayWorkout[nextIndex]['isCompleted'] = true;
-      });
-
-      // A. 更新每日菜單進度 (剛剛改好的 UID 版)
-      await _updateWorkoutInFirebase();
-
-      // 🌟 B. 同時新增到「運動紀錄 (workouts)」集合中
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        String todayStr = "${DateTime
-            .now()
-            .year}-${DateTime
-            .now()
-            .month
-            .toString()
-            .padLeft(2, '0')}-${DateTime
-            .now()
-            .day
-            .toString()
-            .padLeft(2, '0')}";
-
-        await FirebaseFirestore.instance.collection('workouts').add({
-          'uid': user.uid,
-          'exerciseName': exerciseName,
-          'reps': (_todayWorkout[nextIndex]['sets'] ?? 1) *
-              (_todayWorkout[nextIndex]['reps'] ?? 0),
-          'date': todayStr,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
+      await _markAsCompletedAndSave(nextIndex);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 判斷目前進度
     int nextIndex = _getNextUncompletedIndex();
     bool isAllCompleted = _todayWorkout.isNotEmpty && nextIndex == -1;
     String buttonText = '進入第一項訓練';
+
     if (isAllCompleted) {
-      buttonText = '🎉 今日訓練已全數完成！';
+      buttonText = '今日訓練已全數完成！';
     } else if (nextIndex != -1) {
-      buttonText = nextIndex == 0 ? '▶️ 開始: ${_todayWorkout[0]['name']}' : '▶️ 繼續: ${_todayWorkout[nextIndex]['name']}';
+      buttonText = nextIndex == 0 ? '開始: ${_todayWorkout[0]['name']}' : '繼續: ${_todayWorkout[nextIndex]['name']}';
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('🏃 開始運動', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('開始運動', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -180,9 +270,7 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                   },
                 );
                 if (picked != null && picked != _selectedDate) {
-                  setState(() {
-                    _selectedDate = picked;
-                  });
+                  setState(() { _selectedDate = picked; });
                   _fetchWorkoutForDate();
                 }
               },
@@ -198,7 +286,7 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('📅 訓練日期', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    const Text('訓練日期', style: TextStyle(color: Colors.white, fontSize: 16)),
                     Text(
                       "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
                       style: const TextStyle(color: Colors.blueAccent, fontSize: 18, fontWeight: FontWeight.bold),
@@ -208,15 +296,9 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
               ),
             ),
 
-            const Text(
-              '訓練清單',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            const Text('訓練清單', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text(
-              '💡 長按右側圖示可上下拖曳調整順序，左滑可刪除動作。',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
-            ),
+            const Text('長按右側圖示可上下拖曳調整順序，左滑可刪除動作。', style: TextStyle(color: Colors.grey, fontSize: 14)),
             const SizedBox(height: 15),
 
             // --- 動作清單 ---
@@ -225,19 +307,13 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                   ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
                   : _todayWorkout.isEmpty
                   ? const Center(
-                child: Text(
-                  '今天沒有安排菜單喔！\n快去「菜單規劃」新增吧💪',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 16, height: 1.5),
-                ),
+                child: Text('今天沒有安排菜單喔！\n快去「菜單規劃」新增吧', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 16, height: 1.5)),
               )
                   : ReorderableListView.builder(
                 itemCount: _todayWorkout.length,
                 onReorder: (int oldIndex, int newIndex) {
                   setState(() {
-                    if (newIndex > oldIndex) {
-                      newIndex -= 1;
-                    }
+                    if (newIndex > oldIndex) newIndex -= 1;
                     final item = _todayWorkout.removeAt(oldIndex);
                     _todayWorkout.insert(newIndex, item);
                   });
@@ -246,11 +322,14 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                 itemBuilder: (context, index) {
                   final exercise = _todayWorkout[index];
                   final exerciseName = exercise['name'] ?? '未知動作';
+                  final category = exercise['category'] ?? '';
                   final sets = exercise['sets'] ?? 3;
                   final reps = exercise['reps'] ?? 12;
-
-                  // 🌟 判斷這個動作是否已經完成
                   final bool isCompleted = exercise['isCompleted'] == true;
+
+                  // 判斷是否為有氧或休息，來改變顯示文字
+                  bool isCardio = category == '有氧' || exerciseName == '跑步機' || exerciseName == '飛輪';
+                  bool isRest = category == '休息' || exerciseName == '睡覺';
 
                   return Dismissible(
                     key: Key('${exerciseName}_$index'),
@@ -258,37 +337,26 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                     background: Container(
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
+                      decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(15)),
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
                     onDismissed: (direction) {
-                      setState(() {
-                        _todayWorkout.removeAt(index);
-                      });
+                      setState(() { _todayWorkout.removeAt(index); });
                       _updateWorkoutInFirebase();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('$exerciseName 已移除'), duration: const Duration(seconds: 2)),
-                      );
                     },
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        // 🌟 完成的話背景變暗，沒完成維持原本顏色
                         color: isCompleted ? Colors.grey[900]!.withAlpha(120) : Colors.grey[900],
                         borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: isCompleted ? Colors.green.withAlpha(127) : Colors.grey[800]!,
-                        ),
+                        border: Border.all(color: isCompleted ? Colors.green.withAlpha(127) : Colors.grey[800]!),
                       ),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: isCompleted ? Colors.green.withAlpha(50) : Colors.blueAccent.withAlpha(50),
                           child: isCompleted
                               ? const Icon(Icons.check, color: Colors.green)
-                              : Text('${index + 1}', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                              : Icon(isRest ? Icons.bed : (isCardio ? Icons.directions_run : Icons.fitness_center), color: Colors.blueAccent, size: 20),
                         ),
                         title: Text(
                             exerciseName,
@@ -296,12 +364,11 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                               color: isCompleted ? Colors.grey : Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              // 🌟 完成的話加上刪除線
                               decoration: isCompleted ? TextDecoration.lineThrough : null,
                             )
                         ),
                         subtitle: Text(
-                            '建議組數: $sets組 x $reps下',
+                            isRest ? '恢復與休息' : (isCardio ? '有氧訓練' : '建議組數: $sets組 x $reps下'),
                             style: TextStyle(color: Colors.grey[600], fontSize: 12)
                         ),
                         trailing: ReorderableDragStartListener(
@@ -324,13 +391,12 @@ class _StartWorkoutScreenState extends State<StartWorkoutScreen> {
                 icon: Icon(isAllCompleted ? Icons.emoji_events : Icons.play_circle_fill, color: Colors.white, size: 28),
                 label: Text(buttonText, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
-                  // 🌟 如果沒排菜單或是全數完成，按鈕就變灰色且不可點擊
                   backgroundColor: (_todayWorkout.isEmpty || isAllCompleted) ? Colors.grey[800] : Colors.blueAccent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 onPressed: (_todayWorkout.isEmpty || isAllCompleted)
                     ? null
-                    : _startTrainingProcess, // 🌟 呼叫剛才寫好的核心邏輯
+                    : _startTrainingProcess,
               ),
             ),
             const SizedBox(height: 10),
