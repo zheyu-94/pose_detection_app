@@ -50,7 +50,7 @@ class BarbellRowTrainer {
           isPulling = false;
           counter++;
           isBadForm = false;
-          feedbackMessage = "漂亮！慢慢下放⬇️";
+          feedbackMessage = "漂亮！慢慢下放";
         }
       }
     }

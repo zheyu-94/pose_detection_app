@@ -7,7 +7,7 @@ class TricepExtensionTrainer {
 
   int counter = 0;
   int currentState = stateTop;
-  String feedback = "💡 準備：將W槓高舉過頭，大臂盡量貼近耳朵";
+  String feedback = "準備：將W槓高舉過頭，大臂盡量貼近耳朵";
   bool isBadForm = false;
 
   double calculateAngle(PoseLandmark p1, PoseLandmark p2, PoseLandmark p3) {
@@ -50,7 +50,7 @@ class TricepExtensionTrainer {
   void reset() {
     counter = 0;
     currentState = stateTop;
-    feedback = "💡 準備：將W槓高舉過頭，大臂盡量貼近耳朵";
+    feedback = "準備：將W槓高舉過頭，大臂盡量貼近耳朵";
     isBadForm = false;
   }
 }

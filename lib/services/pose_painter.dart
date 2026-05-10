@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:camera/camera.dart'; // 如果沒用到可以拿掉，主要是為了 CameraLensDirection
+import 'package:camera/camera.dart';
 
 class PosePainter extends CustomPainter {
   // 宣告接收進來的變數
@@ -95,11 +95,6 @@ class PosePainter extends CustomPainter {
     return oldDelegate.imageSize != imageSize || oldDelegate.poses != poses;
   }
 }
-
-// ============================================================================
-// ⚠️ 以下是座標轉換工具，如果你專案裡已經有獨立的 coordinates_translator.dart 檔案，
-// 可以把下面這兩個 Function 刪掉，並在最上方 import 你的 translator 檔案即可。
-// ============================================================================
 
 double translateX(double x, Size canvasSize, Size imageSize, InputImageRotation rotation, CameraLensDirection cameraLensDirection) {
   switch (rotation) {

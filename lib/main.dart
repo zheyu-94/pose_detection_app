@@ -86,7 +86,7 @@ class _MainLayoutState extends State<MainLayout> {
           )
               : null,
 
-          // 🌟 側邊欄 (Drawer)
+          // 側邊欄 (Drawer)
           drawer: Drawer(
             backgroundColor: const Color(0xFF1E1E1E),
             child: ListView(
@@ -96,7 +96,7 @@ class _MainLayoutState extends State<MainLayout> {
                   decoration: BoxDecoration(color: Colors.grey[900]),
                   accountName: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   accountEmail: Text(userData['email'] ?? ""),
-                  // 🌟 這裡換成動態顯示大頭貼
+                  // 這裡換成動態顯示大頭貼
                   currentAccountPicture: CircleAvatar(
                     backgroundColor: Colors.blueAccent,
                     backgroundImage: base64Image != null ? MemoryImage(base64Decode(base64Image)) : null,

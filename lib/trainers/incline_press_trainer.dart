@@ -1,13 +1,12 @@
 import 'dart:math';
 
-// 建議可以把檔名和 Class 改叫 ProBenchPressTrainer，或是保留原本名字也可以
 class InclinePressTrainer {
   static const int STATE_TOP = 0;
   static const int STATE_BOTTOM = 1;
 
   int counter = 0;
   int currentState = STATE_TOP;
-  String feedback = "💡 準備中...";
+  String feedback = "準備中...";
 
   double calculateAngle(double ax, double ay, double bx, double by, double cx, double cy) {
     double radians = atan2(cy - by, cx - bx) - atan2(ay - by, ax - bx);
@@ -17,13 +16,12 @@ class InclinePressTrainer {
     return angle;
   }
 
-  // 👇 這裡加一個 exerciseName 參數！
   void processPose({
     required double leftArmAngle,
     required double rightArmAngle,
     required double leftTuckAngle,
     required double rightTuckAngle,
-    String exerciseName = "臥推", // 👈 新增這行
+    String exerciseName = "臥推",
   }) {
 
     bool isLeftTuckGood = true;
@@ -35,14 +33,14 @@ class InclinePressTrainer {
     }
 
     if (!isLeftTuckGood || !isRightTuckGood) {
-      feedback = "⚠️ 手肘微收！小心傷到肩關節！";
+      feedback = "手肘微收！小心傷到肩關節！";
     }
 
     if (currentState == STATE_TOP) {
       // 這裡可以稍微放寬，因為有些人下放不一定能壓到 50 度
       if (leftArmAngle <= 85.0 && rightArmAngle <= 85.0) {
         currentState = STATE_BOTTOM;
-        // 👇 根據動作切換碰胸提示
+        // 根據動作切換碰胸提示
         if (exerciseName.contains('上斜')) {
           feedback = (isLeftTuckGood && isRightTuckGood) ? "推！感受上胸發力！" : feedback;
         } else {
@@ -61,7 +59,7 @@ class InclinePressTrainer {
       }
       else if (leftArmAngle > 90.0 || rightArmAngle > 90.0) {
         if ((leftArmAngle - rightArmAngle).abs() > 30.0) {
-          feedback = "⚠️ 左右手發力不平均！";
+          feedback = "左右手發力不平均！";
         } else {
           feedback = (isLeftTuckGood && isRightTuckGood) ? "繼續推！" : feedback;
         }

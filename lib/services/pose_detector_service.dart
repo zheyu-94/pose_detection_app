@@ -8,7 +8,7 @@ class PoseDetectorService {
     // 請確保妳的程式碼是這樣寫的：
     final options = PoseDetectorOptions(
       mode: PoseDetectionMode.stream,
-      model: PoseDetectionModel.base, // 👈 試試看將 modelQuantity 改成 model
+      model: PoseDetectionModel.base,
     );
     _poseDetector = PoseDetector(options: options);
   }

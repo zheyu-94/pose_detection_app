@@ -48,7 +48,7 @@ class BenchPressTrainer {
           isDown = false;
           counter++;
           isBadForm = false;
-          feedbackMessage = "漂亮！放慢下放⬇️";
+          feedbackMessage = "漂亮！放慢下放";
         }
       }
     }

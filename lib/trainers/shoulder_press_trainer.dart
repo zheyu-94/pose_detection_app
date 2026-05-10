@@ -7,7 +7,7 @@ class ShoulderPressTrainer {
   int counter = 0;
   int currentState = STATE_TOP;
 
-  String feedback = "💡 準備中...";
+  String feedback = "準備中...";
 
   double calculateAngle(double ax, double ay, double bx, double by, double cx, double cy) {
     double radians = atan2(cy - by, cx - bx) - atan2(ay - by, ax - bx);
@@ -22,7 +22,7 @@ class ShoulderPressTrainer {
     required double rightArmAngle,
     required double leftTuckAngle,
     required double rightTuckAngle,
-    String exerciseName = "肩推", // 👈 加入名稱判斷
+    String exerciseName = "肩推",
   }) {
 
     bool isLeftTuckGood = true;
@@ -34,11 +34,11 @@ class ShoulderPressTrainer {
     }
 
     if (!isLeftTuckGood || !isRightTuckGood) {
-      feedback = "⚠️ 手肘微收！不要向外打開太多！";
+      feedback = "手肘微收！不要向外打開太多！";
     }
 
     if (currentState == STATE_TOP) {
-      // 🌟 修正點：把 50 度放寬到 85 度！
+      // 修正點：把 50 度放寬到 85 度！
       if (leftArmAngle <= 85.0 && rightArmAngle <= 85.0) {
         currentState = STATE_BOTTOM;
         feedback = (isLeftTuckGood && isRightTuckGood) ? "下放到底了，向上推！" : feedback;
@@ -56,7 +56,7 @@ class ShoulderPressTrainer {
       }
       else if (leftArmAngle > 90.0 || rightArmAngle > 90.0) {
         if ((leftArmAngle - rightArmAngle).abs() > 30.0) {
-          feedback = "⚠️ 注意左右手平衡！";
+          feedback = "注意左右手平衡！";
         } else {
           feedback = (isLeftTuckGood && isRightTuckGood) ? "用力推！" : feedback;
         }
@@ -64,14 +64,14 @@ class ShoulderPressTrainer {
     }
   }
 
-  // 🌟 動態給予初始提示
+  // 動態給予初始提示
   void reset({String exerciseName = "肩推"}) {
     counter = 0;
     currentState = STATE_TOP;
     if (exerciseName.contains('站姿')) {
-      feedback = "💡 準備：雙腳踩穩，核心與臀部收緊防折腰";
+      feedback = "準備：雙腳踩穩，核心與臀部收緊防折腰";
     } else {
-      feedback = "💡 準備：將板凳椅背調整至 75~90 度";
+      feedback = "準備：將板凳椅背調整至 75~90 度";
     }
   }
 }

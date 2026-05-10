@@ -10,7 +10,7 @@ class SquatTrainer {
 
   int counter = 0;
   int currentState = STATE_STANDING;
-  String feedback = "準備好就開始下蹲 ⬇️";
+  String feedback = "準備好就開始下蹲";
   bool isBadForm = false; // 紀錄姿勢是否錯誤（背部前傾）
 
   // 計算三點夾角
@@ -34,7 +34,7 @@ class SquatTrainer {
     // 1. 防護機制：背部前傾判斷
     if (torsoAngle > 45.0) {
       isBadForm = true;
-      feedback = "⚠️ 抬頭挺胸！背部不要過度前傾！";
+      feedback = "抬頭挺胸！背部不要過度前傾！";
       return; // 姿勢錯誤時，暫停計數狀態的更新
     } else {
       isBadForm = false;
@@ -48,13 +48,13 @@ class SquatTrainer {
       } else if (currentState == STATE_DESCENDING) {
         feedback = "蹲低一點！大腿要平行地面";
       } else {
-        feedback = "準備好就開始下蹲 ⬇️";
+        feedback = "準備好就開始下蹲";
       }
       currentState = STATE_STANDING;
     }
     else if (kneeAngle < 95) {
       currentState = STATE_BOTTOM;
-      feedback = "深度足夠！利用臀腿發力站起 ⬆️";
+      feedback = "深度足夠！利用臀腿發力站起";
     }
     else if (kneeAngle <= 150 && kneeAngle >= 95) {
       if (currentState == STATE_STANDING || currentState == STATE_DESCENDING) {
@@ -70,7 +70,7 @@ class SquatTrainer {
   void reset() {
     counter = 0;
     currentState = STATE_STANDING;
-    feedback = "準備好就開始下蹲 ⬇️";
+    feedback = "準備好就開始下蹲";
     isBadForm = false;
   }
 }

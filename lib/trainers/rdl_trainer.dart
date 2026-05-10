@@ -4,7 +4,7 @@ import 'dart:math' as math;
 class RdlTrainer {
   int counter = 0;
   bool isDown = false;
-  String feedbackMessage = "準備中..."; // 用來提示使用者的文字
+  String feedbackMessage = "準備中...";
 
   // 把角度計算的邏輯也搬進來
   double calculateAngle(PoseLandmark p1, PoseLandmark p2, PoseLandmark p3) {
@@ -31,7 +31,7 @@ class RdlTrainer {
 
       // --- RDL 判斷邏輯開始 ---
       if (kneeAngle < 130) {
-        feedbackMessage = "⚠️ 膝蓋彎太多了！屁股往後推！";
+        feedbackMessage = "膝蓋彎太多了！屁股往後推！";
         return;
       }
 
